@@ -32,7 +32,6 @@ export class PhotoListView extends Component {
     this.handleResize = this.handleResize.bind(this);
     this.getPhotoDetails = this.getPhotoDetails.bind(this);
     this.listRef = React.createRef();
-
     this.state = {
       selectedItems: [],
       lightboxImageIndex: 1,
@@ -44,6 +43,8 @@ export class PhotoListView extends Component {
       modalAddToAlbumOpen: false,
       modalSharePhotosOpen: false,
       modalAlbumShareOpen: false,
+      photosGroupedByDate: props.photosGroupedByDate, 
+      nPhotos: props.idx2hash.length,
     };
   }
 
@@ -53,6 +54,14 @@ export class PhotoListView extends Component {
   }
   componentWillUnmount() {
     window.removeEventListener("resize", this.handleResize);
+  }
+  componentDidUpdate(prevProps) {
+    if (this.props != prevProps) {
+        this.setState({
+            photosGroupedByDate : this.props.photosGroupedByDate,
+            nPhotos: this.props.idx2hash.length
+        })
+    }
   }
 
   handleSelection = (item) => {
@@ -153,12 +162,26 @@ export class PhotoListView extends Component {
     this.props.dispatch(fetchPhotoDetail(image));
   }
 
+  handleDeletePhotos(photoIds) {
+    let newPhotos = []
+    if (this.state.photosGroupedByDate[0].items) {
+        newPhotos = this.state.photosGroupedByDate.map(cluster =>{return {...cluster, items: cluster.items.filter(el => !photoIds.includes(el.id))}})
+    } else {
+        newPhotos = this.state.photosGroupedByDate.filter(el => !photoIds.includes(el.id))
+    }
+    this.setState({
+        photosGroupedByDate : newPhotos,
+        nPhotos: this.state.nPhotos - photoIds.length
+    })
+  }
+
   render() {
     if (
       this.props.loading ||
-      !this.props.photosGroupedByDate ||
-      this.props.photosGroupedByDate.length < 1
+      !this.state.photosGroupedByDate ||
+      this.state.photosGroupedByDate.length < 1
     ) {
+        
       return (
         <div>
           <div style={{ height: 60, paddingTop: 10 }}>
@@ -170,8 +193,8 @@ export class PhotoListView extends Component {
             </Header>
           </div>
 
-          {this.props.photosGroupedByDate &&
-          this.props.photosGroupedByDate.length < 1 ? (
+          {this.state.photosGroupedByDate &&
+          this.state.photosGroupedByDate.length < 1 ? (
             <div
               style={{
                 display: "flex",
@@ -189,7 +212,6 @@ export class PhotoListView extends Component {
       );
     }
 
-    console.log(this.props);
     var isUserAlbum = false;
     if (this.props.route.location.pathname.startsWith("/useralbum/")) {
       isUserAlbum = true;
@@ -215,8 +237,8 @@ export class PhotoListView extends Component {
                   <Header.Content>
                     {this.props.title}{" "}
                     <Header.Subheader>
-                      {this.props.photosGroupedByDate.length != this.props.idx2hash.length ? (this.props.photosGroupedByDate.length +  " days, " ): ""}
-                      {this.props.idx2hash.length} photos
+                      {this.state.photosGroupedByDate.length != this.props.idx2hash.length ? (this.state.photosGroupedByDate.length +  " days, " ): ""}
+                      {this.state.nPhotos} photos
                       {this.props.additionalSubHeader}
                     </Header.Subheader>
                   </Header.Content>
@@ -338,6 +360,23 @@ export class PhotoListView extends Component {
               </Button.Group>
               {getToolbar(this)}
               <Button.Group
+                style={{ paddingLeft: 2, paddingRight: 2}}
+                floated="right"
+                compact
+                color="red"
+              >
+              <Button
+                icon="trash"
+                compact
+                onClick={() => {
+                  if (this.state.selectedItems.length > 0) {
+                    this.handleDeletePhotos(this.state.selectedItems.map(el => el.id))
+                  }
+                }}
+              />
+
+              </Button.Group>
+              <Button.Group
                 style={{ paddingLeft: 2, paddingRight: 2 }}
                 floated="right"
                 compact
@@ -394,13 +433,13 @@ export class PhotoListView extends Component {
             </div>
           )}
         </div>
-        {this.props.photosGroupedByDate ? (
+        {this.state.photosGroupedByDate ? (
           <div style={{ top: TOP_MENU_HEIGHT + 70 }}>
             <Pig
               imageData={
-                !Array.isArray(this.props.photosGroupedByDate)
-                  ? [this.props.photosGroupedByDate]
-                  : this.props.photosGroupedByDate
+                !Array.isArray(this.state.photosGroupedByDate)
+                  ? [this.state.photosGroupedByDate]
+                  : this.state.photosGroupedByDate
               }
               selectable={true}
               selectedItems={this.state.selectedItems}
@@ -408,7 +447,7 @@ export class PhotoListView extends Component {
               handleClick={this.handleClick}
               groupByDate={this.props.isDateView}
               getUrl={(url, pxHeight) => {
-                console.log(pxHeight);
+                //console.log(pxHeight);
                 if (pxHeight < 250) {
                   return (
                     serverAddress +
@@ -423,14 +462,11 @@ export class PhotoListView extends Component {
                 );
               }}
             >
-              {console.log(this.props.photosGroupedByDate)}
-              {console.log(this.props.idx2hash)}
             </Pig>
           </div>
         ) : (
           <div></div>
         )}
-
         <div
           style={{
             backgroundColor: "white",
